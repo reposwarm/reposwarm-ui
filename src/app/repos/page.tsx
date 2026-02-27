@@ -13,7 +13,7 @@ export default function RepositoriesPage() {
   const [newRepo, setNewRepo] = useState({
     name: '',
     url: '',
-    source: 'GitHub' as const
+    source: 'GitHub' as 'GitHub' | 'CodeCommit'
   })
 
   const { data: repos, isLoading } = useRepos()

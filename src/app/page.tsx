@@ -62,7 +62,7 @@ export default function DashboardPage() {
   })
 
   const handleRunDaily = () => {
-    triggerDaily.mutate()
+    triggerDaily.mutate(undefined)
   }
 
   const columns = [

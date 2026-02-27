@@ -34,7 +34,7 @@ export default function TriggersPage() {
   }
 
   const handleTriggerDaily = async () => {
-    await triggerDaily.mutateAsync()
+    await triggerDaily.mutateAsync(undefined)
     setShowDailyModal(false)
   }
 

@@ -36,7 +36,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Environment variables (can be overridden at runtime)
-ENV TEMPORAL_SERVER_URL=http://temporal-alb-internal:8233
+ENV TEMPORAL_HTTP_URL=http://temporal-alb-internal:8233
 ENV TEMPORAL_NAMESPACE=default
 ENV TEMPORAL_TASK_QUEUE=investigate-task-queue
 ENV AWS_REGION=us-east-1

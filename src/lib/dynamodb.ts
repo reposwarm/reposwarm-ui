@@ -19,19 +19,19 @@ export class DynamoDBService {
     try {
       const command = new ScanCommand({
         TableName: this.tableName,
-        FilterExpression: 'begins_with(#pk, :prefix)',
+        FilterExpression: '#sk = :repoMarker',
         ExpressionAttributeNames: {
-          '#pk': 'PK'
+          '#sk': 'analysis_timestamp'
         },
         ExpressionAttributeValues: {
-          ':prefix': 'REPO#'
+          ':repoMarker': 'REPO'
         }
       })
 
       const response = await docClient.send(command)
 
       return (response.Items || []).map(item => ({
-        name: item.repoName || item.SK?.replace('REPO#', '') || '',
+        name: item.repository_name || '',
         url: item.url || '',
         source: item.source || 'GitHub',
         lastAnalyzed: item.lastAnalyzed,
@@ -51,8 +51,8 @@ export class DynamoDBService {
       const command = new GetCommand({
         TableName: this.tableName,
         Key: {
-          PK: `REPO#${name}`,
-          SK: `REPO#${name}`
+          repository_name: name,
+          analysis_timestamp: 'REPO'
         }
       })
 
@@ -63,7 +63,7 @@ export class DynamoDBService {
       }
 
       return {
-        name: response.Item.repoName || name,
+        name: response.Item.repository_name || name,
         url: response.Item.url || '',
         source: response.Item.source || 'GitHub',
         lastAnalyzed: response.Item.lastAnalyzed,
@@ -82,9 +82,8 @@ export class DynamoDBService {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: {
-        PK: `REPO#${repo.name}`,
-        SK: `REPO#${repo.name}`,
-        repoName: repo.name,
+        repository_name: repo.name,
+        analysis_timestamp: 'REPO',
         url: repo.url,
         source: repo.source,
         enabled: repo.enabled,
@@ -106,9 +105,8 @@ export class DynamoDBService {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: {
-        PK: `REPO#${name}`,
-        SK: `REPO#${name}`,
-        repoName: name,
+        repository_name: name,
+        analysis_timestamp: 'REPO',
         ...existingRepo,
         ...updates,
         updatedAt: new Date().toISOString()
@@ -122,8 +120,8 @@ export class DynamoDBService {
     const command = new DeleteCommand({
       TableName: this.tableName,
       Key: {
-        PK: `REPO#${name}`,
-        SK: `REPO#${name}`
+        repository_name: name,
+        analysis_timestamp: 'REPO'
       }
     })
 
@@ -135,8 +133,8 @@ export class DynamoDBService {
       const command = new GetCommand({
         TableName: this.tableName,
         Key: {
-          PK: `CACHE#${key}`,
-          SK: `CACHE#${key}`
+          repository_name: `CACHE#${key}`,
+          analysis_timestamp: 'CACHE'
         }
       })
 
@@ -152,8 +150,8 @@ export class DynamoDBService {
     const command = new PutCommand({
       TableName: this.tableName,
       Item: {
-        PK: `CACHE#${key}`,
-        SK: `CACHE#${key}`,
+        repository_name: `CACHE#${key}`,
+        analysis_timestamp: 'CACHE',
         data,
         updatedAt: new Date().toISOString(),
         ...(ttl && { TTL: Math.floor(Date.now() / 1000) + ttl })

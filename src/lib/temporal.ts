@@ -1,6 +1,6 @@
 import { WorkflowExecution, WorkflowHistory } from './types'
 
-const TEMPORAL_SERVER_URL = process.env.TEMPORAL_SERVER_URL || 'http://temporal-alb-internal:8233'
+const TEMPORAL_HTTP_URL = process.env.TEMPORAL_HTTP_URL || 'http://temporal-alb-internal:8233'
 const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default'
 const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'investigate-task-queue'
 
@@ -10,7 +10,7 @@ export class TemporalClient {
   private taskQueue: string
 
   constructor() {
-    this.baseUrl = TEMPORAL_SERVER_URL
+    this.baseUrl = TEMPORAL_HTTP_URL
     this.namespace = TEMPORAL_NAMESPACE
     this.taskQueue = TEMPORAL_TASK_QUEUE
   }
@@ -40,7 +40,7 @@ export class TemporalClient {
     const data = await response.json()
 
     return {
-      executions: (data.executions || []).map(this.mapExecution),
+      executions: (data.executions || []).map((exec: any) => this.mapExecution(exec)),
       nextPageToken: data.nextPageToken
     }
   }
