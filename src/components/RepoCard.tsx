@@ -1,4 +1,5 @@
-import { GitBranch, Clock, Check, X, Play } from 'lucide-react'
+import { GitBranch, Clock, Check, X, Play, BookOpen } from 'lucide-react'
+import Link from 'next/link'
 import { Repository } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -87,14 +88,14 @@ export function RepoCard({ repo, onToggle, onDelete, onTrigger, triggerPending }
           >
             {repo.status || 'inactive'}
           </span>
-          <a
-            href={repo.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline"
-          >
-            View →
-          </a>
+          <div className="flex gap-3">
+            <Link href={`/repos/${encodeURIComponent(repo.name)}/wiki`} className="text-xs text-primary hover:underline flex items-center gap-1">
+              <BookOpen className="h-3 w-3" />Wiki
+            </Link>
+            <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
+              Source →
+            </a>
+          </div>
         </div>
       </div>
     </div>

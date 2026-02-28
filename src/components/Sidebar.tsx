@@ -9,6 +9,7 @@ import {
   Zap,
   Settings,
   Layers,
+  BookOpen,
   Menu,
   X
 } from 'lucide-react'
