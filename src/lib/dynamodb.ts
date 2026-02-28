@@ -25,7 +25,7 @@ export class DynamoDBService {
           '#sk': 'analysis_timestamp'
         },
         ExpressionAttributeValues: {
-          ':repoMarker': 'REPO'
+          ':repoMarker': 0
         }
       })
 
@@ -53,7 +53,7 @@ export class DynamoDBService {
         TableName: this.tableName,
         Key: {
           repository_name: name,
-          analysis_timestamp: 'REPO'
+          analysis_timestamp: 0
         }
       })
 
@@ -84,7 +84,7 @@ export class DynamoDBService {
       TableName: this.tableName,
       Item: {
         repository_name: repo.name,
-        analysis_timestamp: 'REPO',
+        analysis_timestamp: 0,
         url: repo.url,
         source: repo.source,
         enabled: repo.enabled,
@@ -107,7 +107,7 @@ export class DynamoDBService {
       TableName: this.tableName,
       Item: {
         repository_name: name,
-        analysis_timestamp: 'REPO',
+        analysis_timestamp: 0,
         ...existingRepo,
         ...updates,
         updatedAt: new Date().toISOString()
@@ -122,7 +122,7 @@ export class DynamoDBService {
       TableName: this.tableName,
       Key: {
         repository_name: name,
-        analysis_timestamp: 'REPO'
+        analysis_timestamp: 0
       }
     })
 
