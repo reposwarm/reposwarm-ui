@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { temporalClient } from '@/lib/temporal'
+import { dynamoService } from '@/lib/dynamodb'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,15 +15,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get repo URL from DynamoDB
+    const repo = await dynamoService.getRepo(repoName)
+    const repoUrl = repo?.url || `https://git-codecommit.us-east-1.amazonaws.com/v1/repos/${repoName}`
+
     const workflowId = `investigate-single-${repoName}-${Date.now()}`
 
     const result = await temporalClient.startWorkflow(
       workflowId,
       'InvestigateSingleRepoWorkflow',
       {
-        repoName,
+        repo_name: repoName,
+        repo_url: repoUrl,
         model: model || 'us.anthropic.claude-sonnet-4-6',
-        chunkSize: chunkSize || 10
+        chunk_size: chunkSize || 10
       }
     )
 

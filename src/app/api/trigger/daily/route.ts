@@ -22,7 +22,6 @@ async function autoDiscoverRepos(): Promise<string[]> {
       if (!repo.repositoryName) continue
       discovered.push(repo.repositoryName)
 
-      // Also add to DynamoDB so they persist
       try {
         const existing = await dynamoService.getRepo(repo.repositoryName)
         if (!existing) {
@@ -56,13 +55,11 @@ export async function POST(request: NextRequest) {
 
     let repoList = repos
     if (!repoList || repoList.length === 0) {
-      // Get all enabled repos from DynamoDB
       const allRepos = await dynamoService.listRepos()
       repoList = allRepos
         .filter(r => r.enabled)
         .map(r => r.name)
 
-      // If still empty, auto-discover from CodeCommit
       if (repoList.length === 0) {
         logger.info('No repos in DB, auto-discovering from CodeCommit...')
         repoList = await autoDiscoverRepos()
@@ -77,16 +74,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Build repo objects with URLs for the worker (snake_case Pydantic model)
+    const repoObjects = await Promise.all(
+      repoList.map(async (name: string) => {
+        const repo = await dynamoService.getRepo(name)
+        return {
+          repo_name: name,
+          repo_url: repo?.url || `https://git-codecommit.${AWS_REGION}.amazonaws.com/v1/repos/${name}`
+        }
+      })
+    )
+
     const workflowId = `investigate-daily-${Date.now()}`
 
     const result = await temporalClient.startWorkflow(
       workflowId,
       'InvestigateReposWorkflow',
       {
-        repos: repoList,
+        repos: repoObjects,
         model: model || 'us.anthropic.claude-sonnet-4-6',
-        chunkSize: chunkSize || 10,
-        parallelLimit: parallelLimit || 3
+        chunk_size: chunkSize || 10,
+        parallel_limit: parallelLimit || 3
       }
     )
 
