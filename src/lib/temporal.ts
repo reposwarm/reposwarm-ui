@@ -1,18 +1,33 @@
+import { Client, Connection, WorkflowExecutionAlreadyStartedError } from '@temporalio/client'
 import { WorkflowExecution, WorkflowHistory } from './types'
+import { logger } from './logger'
 
-const TEMPORAL_HTTP_URL = process.env.TEMPORAL_HTTP_URL || 'http://temporal-alb-internal:8233'
+const TEMPORAL_SERVER_URL = process.env.TEMPORAL_SERVER_URL || 'reposwarm-temporal-nlb-11f3aaedbbea9cf1.elb.us-east-1.amazonaws.com:7233'
 const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default'
 const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'investigate-task-queue'
 
+// HTTP URL for read-only operations (list, get, history) via Temporal UI proxy
+const TEMPORAL_HTTP_URL = process.env.TEMPORAL_HTTP_URL || 'http://reposwarm-temporal-nlb-11f3aaedbbea9cf1.elb.us-east-1.amazonaws.com:8233'
+
+let _client: Client | null = null
+
+async function getClient(): Promise<Client> {
+  if (_client) return _client
+  const connection = await Connection.connect({ address: TEMPORAL_SERVER_URL })
+  _client = new Client({ connection, namespace: TEMPORAL_NAMESPACE })
+  logger.info('Connected to Temporal gRPC', { address: TEMPORAL_SERVER_URL, namespace: TEMPORAL_NAMESPACE })
+  return _client
+}
+
 export class TemporalClient {
-  private baseUrl: string
   private namespace: string
   private taskQueue: string
+  private httpUrl: string
 
   constructor() {
-    this.baseUrl = TEMPORAL_HTTP_URL
     this.namespace = TEMPORAL_NAMESPACE
     this.taskQueue = TEMPORAL_TASK_QUEUE
+    this.httpUrl = TEMPORAL_HTTP_URL
   }
 
   async listWorkflows(pageSize = 25, nextPageToken?: string): Promise<{
@@ -23,23 +38,12 @@ export class TemporalClient {
       pageSize: pageSize.toString(),
       ...(nextPageToken && { nextPageToken })
     })
-
-    // Temporal UI proxy uses /workflows for listing (not /workflow-executions)
     const response = await fetch(
-      `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows?${params}`,
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
+      `${this.httpUrl}/api/v1/namespaces/${this.namespace}/workflows?${params}`,
+      { headers: { 'Content-Type': 'application/json' } }
     )
-
-    if (!response.ok) {
-      throw new Error(`Failed to list workflows: ${response.statusText}`)
-    }
-
+    if (!response.ok) throw new Error(`Failed to list workflows: ${response.statusText}`)
     const data = await response.json()
-
     return {
       executions: (data.executions || []).map((exec: any) => this.mapExecution(exec)),
       nextPageToken: data.nextPageToken
@@ -48,38 +52,20 @@ export class TemporalClient {
 
   async getWorkflow(workflowId: string, runId?: string): Promise<WorkflowExecution> {
     const url = runId
-      ? `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/runs/${runId}`
-      : `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}`
-
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to get workflow: ${response.statusText}`)
-    }
-
+      ? `${this.httpUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/runs/${runId}`
+      : `${this.httpUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}`
+    const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } })
+    if (!response.ok) throw new Error(`Failed to get workflow: ${response.statusText}`)
     const data = await response.json()
     return this.mapExecution(data.workflowExecutionInfo)
   }
 
   async getWorkflowHistory(workflowId: string, runId?: string): Promise<WorkflowHistory> {
     const url = runId
-      ? `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/runs/${runId}/history`
-      : `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/history`
-
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to get workflow history: ${response.statusText}`)
-    }
-
+      ? `${this.httpUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/runs/${runId}/history`
+      : `${this.httpUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/history`
+    const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } })
+    if (!response.ok) throw new Error(`Failed to get workflow history: ${response.statusText}`)
     const data = await response.json()
     return {
       events: (data.events || []).map((e: any) => ({
@@ -92,24 +78,9 @@ export class TemporalClient {
   }
 
   async terminateWorkflow(workflowId: string, runId?: string, reason?: string): Promise<void> {
-    const url = runId
-      ? `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/runs/${runId}/terminate`
-      : `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows/${workflowId}/terminate`
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Temporal-Csrf-Token': 'nocheck'
-      },
-      body: JSON.stringify({
-        reason: reason || 'Terminated via UI'
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to terminate workflow: ${response.statusText}`)
-    }
+    const client = await getClient()
+    const handle = client.workflow.getHandle(workflowId, runId)
+    await handle.terminate(reason || 'Terminated via UI')
   }
 
   async startWorkflow(
@@ -117,65 +88,38 @@ export class TemporalClient {
     workflowType: string,
     input: any
   ): Promise<{ workflowId: string; runId: string }> {
-    const response = await fetch(
-      `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Temporal-Csrf-Token': 'nocheck'
-        },
-        body: JSON.stringify({
-          workflowId,
-          workflowType: {
-            name: workflowType
-          },
-          taskQueue: {
-            name: this.taskQueue
-          },
-          input: {
-            payloads: [
-              {
-                metadata: {
-                  encoding: 'anNvbi9wbGFpbg==' // base64 for 'json/plain'
-                },
-                data: Buffer.from(JSON.stringify(input)).toString('base64')
-              }
-            ]
-          }
-        })
+    const client = await getClient()
+    try {
+      const handle = await client.workflow.start(workflowType, {
+        taskQueue: this.taskQueue,
+        workflowId,
+        args: [input]
+      })
+      return { workflowId: handle.workflowId, runId: handle.firstExecutionRunId }
+    } catch (err) {
+      if (err instanceof WorkflowExecutionAlreadyStartedError) {
+        throw new Error(`Workflow ${workflowId} is already running`)
       }
-    )
-
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to start workflow: ${error}`)
-    }
-
-    const data = await response.json()
-    return {
-      workflowId: data.workflowId,
-      runId: data.runId
+      throw err
     }
   }
 
   async checkHealth(): Promise<boolean> {
     try {
-      // Try system-info first (native HTTP API)
-      const response = await fetch(`${this.baseUrl}/api/v1/system-info`, {
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      })
-      if (response.ok) return true
-
-      // Fallback: try listing workflows (works through temporal-ui proxy)
-      const fallback = await fetch(
-        `${this.baseUrl}/api/v1/namespaces/${this.namespace}/workflows?pageSize=1`,
-        { headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(5000) }
-      )
-      return fallback.ok
+      const client = await getClient()
+      const workflows = client.workflow.list({ pageSize: 1 })
+      for await (const _wf of workflows) { break }
+      return true
     } catch {
-      return false
+      try {
+        const response = await fetch(`${this.httpUrl}/api/v1/system-info`, {
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000),
+        })
+        return response.ok
+      } catch {
+        return false
+      }
     }
   }
 
