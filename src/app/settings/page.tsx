@@ -35,7 +35,7 @@ export default function SettingsPage() {
               Default Model
             </label>
             <div className="px-4 py-2 bg-background border border-border rounded-lg">
-              {config?.defaultModel || 'claude-3-opus-20240229'}
+              {config?.defaultModel || 'us.anthropic.claude-sonnet-4-6'}
             </div>
           </div>
           <div>

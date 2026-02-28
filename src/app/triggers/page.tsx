@@ -11,7 +11,7 @@ export default function TriggersPage() {
   const [selectedRepo, setSelectedRepo] = useState('')
   const [selectedRepos, setSelectedRepos] = useState<string[]>([])
   const [customChunkSize, setCustomChunkSize] = useState('10')
-  const [customModel, setCustomModel] = useState('claude-3-opus-20240229')
+  const [customModel, setCustomModel] = useState('us.anthropic.claude-sonnet-4-6')
   const [showDailyModal, setShowDailyModal] = useState(false)
   const [showCustom, setShowCustom] = useState(false)
 
@@ -194,9 +194,12 @@ export default function TriggersPage() {
                   onChange={(e) => setCustomModel(e.target.value)}
                   className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                  <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                  <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                  <option value="us.anthropic.claude-sonnet-4-6">Claude Sonnet 4.6 (default)</option>
+                  <option value="us.anthropic.claude-sonnet-4-20250514-v1:0">Claude Sonnet 4</option>
+                  <option value="us.anthropic.claude-opus-4-6-v1">Claude Opus 4.6</option>
+                  <option value="us.anthropic.claude-haiku-3-5-20241022-v1:0">Claude Haiku 3.5</option>
+                  <option value="amazon.nova-pro-v1:0">Amazon Nova Pro</option>
+                  <option value="amazon.nova-lite-v1:0">Amazon Nova Lite</option>
                 </select>
               </div>
             </div>

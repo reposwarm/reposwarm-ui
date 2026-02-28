@@ -3,7 +3,7 @@ import { RepoSwarmConfig } from '@/lib/types'
 
 export async function GET() {
   const config: RepoSwarmConfig = {
-    defaultModel: process.env.DEFAULT_MODEL || 'claude-3-opus-20240229',
+    defaultModel: process.env.DEFAULT_MODEL || 'us.anthropic.claude-sonnet-4-6',
     chunkSize: parseInt(process.env.CHUNK_SIZE || '10'),
     sleepDuration: parseInt(process.env.SLEEP_DURATION || '2000'),
     parallelLimit: parseInt(process.env.PARALLEL_LIMIT || '3'),

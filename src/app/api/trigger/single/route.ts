@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       'InvestigateSingleRepoWorkflow',
       {
         repoName,
-        model: model || 'claude-3-opus-20240229',
+        model: model || 'us.anthropic.claude-sonnet-4-6',
         chunkSize: chunkSize || 10
       }
     )
