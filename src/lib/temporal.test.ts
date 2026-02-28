@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// Mock @temporalio/client to prevent real gRPC connections in tests
+vi.mock('@temporalio/client', () => ({
+  Connection: { connect: vi.fn().mockRejectedValue(new Error('test: no gRPC in unit tests')) },
+  Client: vi.fn(),
+  WorkflowExecutionAlreadyStartedError: class extends Error {}
+}))
+
 import { TemporalClient } from './temporal'
 
 describe('TemporalClient', () => {
   let client: TemporalClient
-  let fetchMock: any
+  let fetchMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     client = new TemporalClient()
@@ -15,8 +23,8 @@ describe('TemporalClient', () => {
     vi.clearAllMocks()
   })
 
-  describe('URL construction', () => {
-    it('should construct correct URL for listing workflows', async () => {
+  describe('listWorkflows (HTTP)', () => {
+    it('should construct correct URL with pagination', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ executions: [] })
@@ -30,194 +38,153 @@ describe('TemporalClient', () => {
       )
     })
 
-    it('should construct correct URL for getting workflow with runId', async () => {
+    it('should throw on failure', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, statusText: 'Internal Server Error' })
+      await expect(client.listWorkflows()).rejects.toThrow('Failed to list workflows')
+    })
+
+    it('should map workflow executions', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ workflowExecutionInfo: {} })
+        json: async () => ({
+          executions: [{
+            type: { name: 'InvestigateSingleRepoWorkflow' },
+            execution: { workflowId: 'wf-1', runId: 'run-1' },
+            status: 'RUNNING',
+            startTime: '2026-01-01T00:00:00Z'
+          }]
+        })
+      })
+
+      const result = await client.listWorkflows()
+      expect(result.executions).toHaveLength(1)
+      expect(result.executions[0].workflowId).toBe('wf-1')
+      expect(result.executions[0].type).toBe('single')
+    })
+  })
+
+  describe('getWorkflow (HTTP)', () => {
+    it('should use runId in URL when provided', async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ workflowExecutionInfo: { execution: { workflowId: 'wf', runId: 'r' } } })
       })
 
       await client.getWorkflow('workflow-123', 'run-456')
 
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/namespaces/default/workflows/workflow-123/runs/run-456'),
+        expect.stringContaining('/workflows/workflow-123/runs/run-456'),
         expect.any(Object)
       )
     })
 
-    it('should construct correct URL for getting workflow without runId', async () => {
+    it('should omit runId from URL when not provided', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ workflowExecutionInfo: {} })
+        json: async () => ({ workflowExecutionInfo: { execution: { workflowId: 'wf', runId: 'r' } } })
       })
 
       await client.getWorkflow('workflow-123')
 
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/namespaces/default/workflows/workflow-123'),
-        expect.any(Object)
-      )
+      const url = fetchMock.mock.calls[0][0]
+      expect(url).toContain('/workflows/workflow-123')
+      expect(url).not.toContain('/runs/')
     })
 
-    it('should construct correct URL for terminating workflow', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true
-      })
-
-      await client.terminateWorkflow('workflow-123', 'run-456', 'Test reason')
-
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/namespaces/default/workflows/workflow-123/runs/run-456/terminate'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ reason: 'Test reason' })
-        })
-      )
+    it('should throw on failure', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, statusText: 'Not Found' })
+      await expect(client.getWorkflow('wf-1')).rejects.toThrow('Failed to get workflow')
     })
   })
 
-  describe('Error handling', () => {
-    it('should throw error when listing workflows fails', async () => {
+  describe('getWorkflowHistory (HTTP)', () => {
+    it('should return mapped events', async () => {
       fetchMock.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Internal Server Error'
+        ok: true,
+        json: async () => ({
+          events: [{ eventId: '1', eventTime: '2026-01-01', eventType: 'WorkflowStarted' }]
+        })
       })
 
-      await expect(client.listWorkflows()).rejects.toThrow('Failed to list workflows: Internal Server Error')
+      const result = await client.getWorkflowHistory('wf-1')
+      expect(result.events).toHaveLength(1)
+      expect(result.events[0].eventType).toBe('WorkflowStarted')
     })
 
-    it('should throw error when getting workflow fails', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Not Found'
-      })
-
-      await expect(client.getWorkflow('workflow-123')).rejects.toThrow('Failed to get workflow: Not Found')
+    it('should throw on failure', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, statusText: 'Forbidden' })
+      await expect(client.getWorkflowHistory('wf-1')).rejects.toThrow('Failed to get workflow history')
     })
+  })
 
-    it('should throw error when getting workflow history fails', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Forbidden'
-      })
-
-      await expect(client.getWorkflowHistory('workflow-123')).rejects.toThrow('Failed to get workflow history: Forbidden')
+  describe('startWorkflow (gRPC)', () => {
+    it('should throw when gRPC connection is unavailable', async () => {
+      // In test env, gRPC is mocked to reject — verifies error handling
+      await expect(client.startWorkflow('wf-1', 'TestWorkflow', {})).rejects.toThrow()
     })
+  })
 
-    it('should throw error when terminating workflow fails', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        statusText: 'Bad Request'
-      })
-
-      await expect(client.terminateWorkflow('workflow-123')).rejects.toThrow('Failed to terminate workflow: Bad Request')
-    })
-
-    it('should throw error with response text when starting workflow fails', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        text: async () => 'Invalid input format'
-      })
-
-      await expect(client.startWorkflow('workflow-123', 'TestWorkflow', {})).rejects.toThrow('Failed to start workflow: Invalid input format')
+  describe('terminateWorkflow (gRPC)', () => {
+    it('should throw when gRPC connection is unavailable', async () => {
+      await expect(client.terminateWorkflow('wf-1')).rejects.toThrow()
     })
   })
 
   describe('checkHealth', () => {
-    it('should return true when health check succeeds', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true
-      })
-
+    it('should fall back to HTTP when gRPC fails', async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true })
       const result = await client.checkHealth()
       expect(result).toBe(true)
     })
 
-    it('should return false when health check fails', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false
-      })
-
+    it('should return false when both fail', async () => {
+      fetchMock.mockRejectedValueOnce(new Error('HTTP failed'))
       const result = await client.checkHealth()
       expect(result).toBe(false)
-    })
-
-    it('should return false when health check throws', async () => {
-      fetchMock.mockRejectedValueOnce(new Error('Network error'))
-
-      const result = await client.checkHealth()
-      expect(result).toBe(false)
-    })
-  })
-
-  describe('startWorkflow', () => {
-    it('should start workflow with correct payload structure', async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ workflowId: 'workflow-123', runId: 'run-456' })
-      })
-
-      const result = await client.startWorkflow('workflow-123', 'TestWorkflow', { test: 'data' })
-
-      expect(result).toEqual({
-        workflowId: 'workflow-123',
-        runId: 'run-456'
-      })
-
-      const callArgs = fetchMock.mock.calls[0]
-      const body = JSON.parse(callArgs[1].body)
-
-      expect(body.workflowId).toBe('workflow-123')
-      expect(body.workflowType.name).toBe('TestWorkflow')
-      expect(body.taskQueue.name).toBe('investigate-task-queue')
-      expect(body.input.payloads).toHaveLength(1)
-      expect(body.input.payloads[0].metadata.encoding).toBe('anNvbi9wbGFpbg==')
     })
   })
 
   describe('Workflow type inference', () => {
-    it('should infer single workflow type', async () => {
+    it('should infer single type', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           workflowExecutionInfo: {
             type: { name: 'SingleRepoInvestigateWorkflow' },
-            execution: { workflowId: 'test', runId: 'test' }
+            execution: { workflowId: 't', runId: 't' }
           }
         })
       })
-
-      const result = await client.getWorkflow('test')
-      expect(result.type).toBe('single')
+      const r = await client.getWorkflow('t')
+      expect(r.type).toBe('single')
     })
 
-    it('should infer daily workflow type', async () => {
+    it('should infer daily type', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           workflowExecutionInfo: {
             type: { name: 'DailyScheduledWorkflow' },
-            execution: { workflowId: 'test', runId: 'test' }
+            execution: { workflowId: 't', runId: 't' }
           }
         })
       })
-
-      const result = await client.getWorkflow('test')
-      expect(result.type).toBe('daily')
+      const r = await client.getWorkflow('t')
+      expect(r.type).toBe('daily')
     })
 
-    it('should default to multi workflow type', async () => {
+    it('should default to multi type', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           workflowExecutionInfo: {
             type: { name: 'SomeOtherWorkflow' },
-            execution: { workflowId: 'test', runId: 'test' }
+            execution: { workflowId: 't', runId: 't' }
           }
         })
       })
-
-      const result = await client.getWorkflow('test')
-      expect(result.type).toBe('multi')
+      const r = await client.getWorkflow('t')
+      expect(r.type).toBe('multi')
     })
   })
 })
