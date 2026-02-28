@@ -1,6 +1,6 @@
-import { GitBranch, Clock, Check, X, Play, BookOpen } from 'lucide-react'
+import { GitBranch, Clock, Check, X, Play, BookOpen, StopCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { Repository } from '@/lib/types'
+import { Repository, WorkflowExecution } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -9,16 +9,61 @@ interface RepoCardProps {
   onToggle?: (repo: Repository) => void
   onDelete?: (repo: Repository) => void
   onTrigger?: (repo: Repository) => void
+  onCancelWorkflow?: (workflowId: string) => void
   triggerPending?: boolean
+  runningWorkflow?: WorkflowExecution | null
 }
 
-export function RepoCard({ repo, onToggle, onDelete, onTrigger, triggerPending }: RepoCardProps) {
+export function RepoCard({ repo, onToggle, onDelete, onTrigger, onCancelWorkflow, triggerPending, runningWorkflow }: RepoCardProps) {
+  const isInvestigating = !!runningWorkflow
+
+  const handleCancel = async () => {
+    if (!runningWorkflow) return
+    try {
+      const res = await fetch(`/api/workflows/${runningWorkflow.workflowId}/terminate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Cancelled from repo card' })
+      })
+      if (res.ok) {
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error('Failed to cancel workflow:', err)
+    }
+  }
+
   return (
-    <div className="bg-card p-4 lg:p-6 rounded-lg border border-border hover:border-primary/50 transition-all">
+    <div className={cn(
+      'bg-card p-4 lg:p-6 rounded-lg border transition-all',
+      isInvestigating
+        ? 'border-yellow-500/40 shadow-sm shadow-yellow-500/5'
+        : 'border-border hover:border-primary/50'
+    )}>
+      {/* Investigating banner */}
+      {isInvestigating && (
+        <div className="flex items-center justify-between gap-2 mb-4 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+          <div className="flex items-center gap-2 text-yellow-500 text-sm font-medium">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Investigating...
+          </div>
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
+          >
+            <StopCircle className="h-3 w-3" />
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2 bg-primary/10 rounded-lg shrink-0">
-            <GitBranch className="h-5 w-5 text-primary" />
+          <div className={cn(
+            'p-2 rounded-lg shrink-0',
+            isInvestigating ? 'bg-yellow-500/10' : 'bg-primary/10'
+          )}>
+            <GitBranch className={cn('h-5 w-5', isInvestigating ? 'text-yellow-500' : 'text-primary')} />
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{repo.name}</h3>
@@ -26,7 +71,7 @@ export function RepoCard({ repo, onToggle, onDelete, onTrigger, triggerPending }
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {onTrigger && repo.enabled && (
+          {onTrigger && repo.enabled && !isInvestigating && (
             <button
               onClick={() => onTrigger(repo)}
               disabled={triggerPending}

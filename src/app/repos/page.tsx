@@ -3,10 +3,18 @@
 import { useState } from 'react'
 import { useRepos, useAddRepo, useUpdateRepo, useDeleteRepo, useDiscoverRepos } from '@/hooks/useRepos'
 import { useTriggerSingle } from '@/hooks/useTrigger'
+import { useWorkflows } from '@/hooks/useWorkflows'
 import { RepoCard } from '@/components/RepoCard'
-import { Plus, Search, Radar, Play } from 'lucide-react'
-import { Repository } from '@/lib/types'
+import { Plus, Search, Radar } from 'lucide-react'
+import { Repository, WorkflowExecution } from '@/lib/types'
 import toast from 'react-hot-toast'
+
+function getRunningWorkflowForRepo(repoName: string, workflows: WorkflowExecution[]): WorkflowExecution | null {
+  return workflows.find(w =>
+    w.status.toLowerCase() === 'running' &&
+    w.workflowId.includes(repoName)
+  ) || null
+}
 
 export default function RepositoriesPage() {
   const [showAddForm, setShowAddForm] = useState(false)
@@ -23,6 +31,11 @@ export default function RepositoriesPage() {
   const deleteRepo = useDeleteRepo()
   const discover = useDiscoverRepos()
   const triggerSingle = useTriggerSingle()
+  const { data: workflowsData } = useWorkflows(50)
+
+  const runningWorkflows = (workflowsData?.executions || []).filter(
+    (w: WorkflowExecution) => w.status.toLowerCase() === 'running'
+  )
 
   const filteredRepos = (repos || []).filter(repo =>
     repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -32,10 +45,7 @@ export default function RepositoriesPage() {
   const handleAddRepo = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await addRepo.mutateAsync({
-        ...newRepo,
-        enabled: true
-      })
+      await addRepo.mutateAsync({ ...newRepo, enabled: true })
       toast.success(`Repository ${newRepo.name} added successfully`)
       setNewRepo({ name: '', url: '', source: 'GitHub' })
       setShowAddForm(false)
@@ -46,10 +56,7 @@ export default function RepositoriesPage() {
 
   const handleToggleRepo = async (repo: Repository) => {
     try {
-      await updateRepo.mutateAsync({
-        name: repo.name,
-        updates: { enabled: !repo.enabled }
-      })
+      await updateRepo.mutateAsync({ name: repo.name, updates: { enabled: !repo.enabled } })
       toast.success(`Repository ${repo.name} ${!repo.enabled ? 'enabled' : 'disabled'}`)
     } catch {
       toast.error('Failed to update repository')
@@ -72,13 +79,15 @@ export default function RepositoriesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Search, Discover, and Add */}
       <div className="bg-card rounded-lg border border-border p-4 lg:p-6">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold pl-10 lg:pl-0">Repositories</h2>
             <span className="text-sm text-muted-foreground">
               {repos?.length || 0} total · {repos?.filter(r => r.enabled).length || 0} enabled
+              {runningWorkflows.length > 0 && (
+                <span className="ml-2 text-yellow-500">· {runningWorkflows.length} investigating</span>
+              )}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -97,11 +106,9 @@ export default function RepositoriesPage() {
                 onClick={() => discover.mutate()}
                 disabled={discover.isPending}
                 className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
-                title="Auto-discover all CodeCommit repositories"
               >
                 <Radar className={`h-4 w-4 ${discover.isPending ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{discover.isPending ? 'Discovering...' : 'Auto-Discover'}</span>
-                <span className="sm:hidden">{discover.isPending ? '...' : 'Discover'}</span>
               </button>
               <button
                 onClick={() => setShowAddForm(!showAddForm)}
@@ -109,92 +116,58 @@ export default function RepositoriesPage() {
               >
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Add Repo</span>
-                <span className="sm:hidden">Add</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Discovery result banner */}
         {discover.data && (
           <div className="mb-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded-lg text-sm">
             <span className="font-medium text-amber-400">Discovery complete:</span>{' '}
-            Found {discover.data.discovered} CodeCommit repos —{' '}
-            {discover.data.added > 0
+            Found {discover.data.discovered} repos — {discover.data.added > 0
               ? <span className="text-green-400">{discover.data.added} added</span>
-              : 'all already tracked'
-            }
-            {discover.data.skipped > 0 && <span className="text-muted-foreground"> ({discover.data.skipped} skipped)</span>}
+              : 'all already tracked'}
           </div>
         )}
 
-        {/* Add Repository Form */}
         {showAddForm && (
           <form onSubmit={handleAddRepo} className="bg-background p-4 rounded-lg border border-border">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input
-                type="text"
-                placeholder="Repository Name"
-                value={newRepo.name}
+              <input type="text" placeholder="Repository Name" value={newRepo.name}
                 onChange={(e) => setNewRepo({ ...newRepo, name: e.target.value })}
-                className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Repository URL"
-                value={newRepo.url}
+                className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" required />
+              <input type="text" placeholder="Repository URL" value={newRepo.url}
                 onChange={(e) => setNewRepo({ ...newRepo, url: e.target.value })}
-                className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
+                className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" required />
               <div className="flex gap-2">
-                <select
-                  value={newRepo.source}
-                  onChange={(e) => setNewRepo({ ...newRepo, source: e.target.value as 'GitHub' | 'CodeCommit' })}
-                  className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
+                <select value={newRepo.source} onChange={(e) => setNewRepo({ ...newRepo, source: e.target.value as any })}
+                  className="px-4 py-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
                   <option value="GitHub">GitHub</option>
                   <option value="CodeCommit">CodeCommit</option>
                 </select>
-                <button
-                  type="submit"
-                  disabled={addRepo.isPending}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-                >
+                <button type="submit" disabled={addRepo.isPending}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50">
                   {addRepo.isPending ? '...' : 'Add'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
-                >
-                  Cancel
-                </button>
+                <button type="button" onClick={() => setShowAddForm(false)}
+                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors">Cancel</button>
               </div>
             </div>
           </form>
         )}
       </div>
 
-      {/* Repository Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
         {isLoading ? (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            Loading repositories...
-          </div>
+          <div className="col-span-full text-center py-12 text-muted-foreground">Loading repositories...</div>
         ) : filteredRepos.length === 0 ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">
             {searchQuery ? 'No repositories match your search' : (
               <div className="space-y-3">
                 <p>No repositories configured</p>
-                <button
-                  onClick={() => discover.mutate()}
-                  disabled={discover.isPending}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <Radar className="h-4 w-4" />
-                  Auto-Discover from CodeCommit
+                <button onClick={() => discover.mutate()} disabled={discover.isPending}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors inline-flex items-center gap-2">
+                  <Radar className="h-4 w-4" />Auto-Discover from CodeCommit
                 </button>
               </div>
             )}
@@ -208,6 +181,7 @@ export default function RepositoriesPage() {
               onDelete={handleDeleteRepo}
               onTrigger={handleTriggerRepo}
               triggerPending={triggerSingle.isPending}
+              runningWorkflow={getRunningWorkflowForRepo(repo.name, runningWorkflows)}
             />
           ))
         )}
