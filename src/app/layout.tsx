@@ -11,6 +11,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'RepoSwarm UI',
   description: 'AI-powered multi-repo architecture discovery platform',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
