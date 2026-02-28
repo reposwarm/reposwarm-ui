@@ -93,10 +93,10 @@ export default function WorkflowsPage() {
                 key={`${wf.workflowId}-${wf.runId}`}
                 className={cn(
                   'bg-card rounded-lg border p-4 lg:p-5 transition-all',
-                  isRunning ? 'border-blue-500/30 shadow-sm shadow-blue-500/5' :
+                  isRunning ? 'border-yellow-500/30 shadow-sm shadow-yellow-500/5' :
                   isCompleted ? 'border-green-500/30' :
                   isFailed ? 'border-red-500/30' :
-                  isTerminated ? 'border-gray-500/20' :
+                  isTerminated ? 'border-purple-500/20' :
                   'border-border'
                 )}
               >
@@ -104,10 +104,10 @@ export default function WorkflowsPage() {
                   <div className="flex items-start gap-3 min-w-0">
                     <div className={cn(
                       'w-1 h-12 rounded-full shrink-0',
-                      isRunning ? 'bg-blue-500 animate-pulse' :
+                      isRunning ? 'bg-yellow-500 animate-pulse' :
                       isCompleted ? 'bg-green-500' :
                       isFailed ? 'bg-red-500' :
-                      'bg-gray-500'
+                      'bg-purple-500'
                     )} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">

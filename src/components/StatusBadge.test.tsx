@@ -9,7 +9,7 @@ describe('StatusBadge', () => {
 
       expect(screen.getByText('Running')).toBeInTheDocument()
       expect(container.querySelector('.animate-ping')).toBeInTheDocument()
-      expect(container.querySelector('.text-blue-500')).toBeInTheDocument()
+      expect(container.querySelector('.text-yellow-500')).toBeInTheDocument()
     })
 
     it('should render Completed status without pulse', () => {
@@ -33,7 +33,7 @@ describe('StatusBadge', () => {
 
       expect(screen.getByText('Terminated')).toBeInTheDocument()
       expect(container.querySelector('.animate-ping')).not.toBeInTheDocument()
-      expect(container.querySelector('.text-gray-500')).toBeInTheDocument()
+      expect(container.querySelector('.text-purple-500')).toBeInTheDocument()
     })
 
     it('should render Canceled status without pulse', () => {
@@ -41,7 +41,7 @@ describe('StatusBadge', () => {
 
       expect(screen.getByText('Canceled')).toBeInTheDocument()
       expect(container.querySelector('.animate-ping')).not.toBeInTheDocument()
-      expect(container.querySelector('.text-gray-500')).toBeInTheDocument()
+      expect(container.querySelector('.text-purple-500')).toBeInTheDocument()
     })
 
     it('should render TimedOut status without pulse', () => {
@@ -90,7 +90,7 @@ describe('StatusBadge', () => {
       const { container } = render(<StatusBadge status="running" />)
 
       expect(screen.getByText('running')).toBeInTheDocument()
-      expect(container.querySelector('.text-blue-500')).toBeInTheDocument()
+      expect(container.querySelector('.text-yellow-500')).toBeInTheDocument()
     })
 
     it('should handle uppercase status', () => {

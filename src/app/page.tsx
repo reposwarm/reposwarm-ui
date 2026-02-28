@@ -112,18 +112,24 @@ export default function DashboardPage() {
           title="Active Runs"
           value={stats?.activeRuns || 0}
           icon={Activity}
+          iconColor="text-yellow-500"
+          iconBg="bg-yellow-500/10"
           description="Currently running"
         />
         <StatsCard
           title="Completed Today"
           value={stats?.completedToday || 0}
           icon={CheckCircle}
+          iconColor="text-green-500"
+          iconBg="bg-green-500/10"
           description="Successfully finished"
         />
         <StatsCard
           title="Failed Today"
           value={stats?.failedToday || 0}
           icon={XCircle}
+          iconColor="text-red-500"
+          iconBg="bg-red-500/10"
           description="Encountered errors"
         />
       </div>

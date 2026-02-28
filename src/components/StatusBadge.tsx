@@ -12,9 +12,9 @@ export function StatusBadge({ status, className, showPulse = true }: StatusBadge
     switch (status?.toLowerCase()) {
       case 'running':
         return {
-          bg: 'bg-blue-500/10',
-          text: 'text-blue-500',
-          border: 'border-blue-500/20',
+          bg: 'bg-yellow-500/10',
+          text: 'text-yellow-500',
+          border: 'border-yellow-500/20',
           pulse: showPulse
         }
       case 'completed':
@@ -34,9 +34,9 @@ export function StatusBadge({ status, className, showPulse = true }: StatusBadge
       case 'terminated':
       case 'canceled':
         return {
-          bg: 'bg-gray-500/10',
-          text: 'text-gray-500',
-          border: 'border-gray-500/20',
+          bg: 'bg-purple-500/10',
+          text: 'text-purple-500',
+          border: 'border-purple-500/20',
           pulse: false
         }
       case 'timedout':

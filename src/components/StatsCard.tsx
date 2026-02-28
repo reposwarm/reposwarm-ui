@@ -6,6 +6,8 @@ interface StatsCardProps {
   value: string | number
   description?: string
   icon: LucideIcon
+  iconColor?: string
+  iconBg?: string
   trend?: {
     value: number
     isPositive: boolean
@@ -18,6 +20,8 @@ export function StatsCard({
   value,
   description,
   icon: Icon,
+  iconColor,
+  iconBg,
   trend,
   className
 }: StatsCardProps) {
@@ -43,8 +47,8 @@ export function StatsCard({
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        <div className="p-3 bg-primary/10 rounded-lg">
-          <Icon className="h-6 w-6 text-primary" />
+        <div className={cn('p-3 rounded-lg', iconBg || 'bg-primary/10')}>
+          <Icon className={cn('h-6 w-6', iconColor || 'text-primary')} />
         </div>
       </div>
     </div>
