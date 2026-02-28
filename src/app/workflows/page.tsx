@@ -3,11 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWorkflows } from '@/hooks/useWorkflows'
-import { DataTable } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { formatDate, formatDuration } from '@/lib/utils'
 import { WorkflowExecution } from '@/lib/types'
-import { Filter } from 'lucide-react'
+import { Filter, BookOpen, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
+
+function extractRepoName(workflowId: string): string | null {
+  // investigate-single-{repoName}-{timestamp}
+  const singleMatch = workflowId.match(/^investigate-single-(.+)-\d+$/)
+  if (singleMatch) return singleMatch[1]
+  return null
+}
 
 export default function WorkflowsPage() {
   const router = useRouter()
@@ -23,53 +31,10 @@ export default function WorkflowsPage() {
     return true
   })
 
-  const columns = [
-    {
-      key: 'workflowId',
-      header: 'Workflow ID',
-      sortable: true,
-      className: 'font-mono text-xs'
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      sortable: true,
-      accessor: (row: WorkflowExecution) => (
-        <span className="capitalize">{row.type}</span>
-      )
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      accessor: (row: WorkflowExecution) => (
-        <StatusBadge status={row.status} />
-      )
-    },
-    {
-      key: 'startTime',
-      header: 'Start Time',
-      accessor: (row: WorkflowExecution) => formatDate(row.startTime),
-      sortable: true
-    },
-    {
-      key: 'duration',
-      header: 'Duration',
-      accessor: (row: WorkflowExecution) =>
-        row.duration ? formatDuration(row.duration) : '-',
-      sortable: true
-    },
-    {
-      key: 'repoCount',
-      header: 'Repos',
-      accessor: (row: WorkflowExecution) => row.repoCount || '-',
-      sortable: true
-    }
-  ]
-
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-card rounded-lg border border-border p-6">
+      <div className="bg-card rounded-lg border border-border p-4 lg:p-6">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="h-5 w-5 text-muted-foreground" />
           <h2 className="text-lg font-semibold">Filters</h2>
@@ -105,32 +70,91 @@ export default function WorkflowsPage() {
         </div>
       </div>
 
-      {/* Workflows Table */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-semibold mb-4">Workflow Executions</h2>
+      {/* Workflows */}
+      <div className="space-y-3">
         {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="bg-card rounded-lg border border-border p-12 text-center text-muted-foreground">
             Loading workflows...
           </div>
+        ) : filteredWorkflows.length === 0 ? (
+          <div className="bg-card rounded-lg border border-border p-12 text-center text-muted-foreground">
+            No workflows found
+          </div>
         ) : (
-          <>
-            <DataTable
-              columns={columns}
-              data={filteredWorkflows}
-              onRowClick={(row) => router.push(`/workflows/${row.workflowId}`)}
-              emptyMessage="No workflows found"
-            />
-            {data?.nextPageToken && (
-              <div className="mt-4 flex justify-center">
-                <button
-                  onClick={() => setPageToken(data.nextPageToken)}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  Load More
-                </button>
+          filteredWorkflows.map((wf: WorkflowExecution) => {
+            const repoName = extractRepoName(wf.workflowId)
+            const isCompleted = wf.status.toLowerCase() === 'completed'
+            const isRunning = wf.status.toLowerCase() === 'running'
+            const isFailed = wf.status.toLowerCase() === 'failed'
+            const isTerminated = wf.status.toLowerCase() === 'terminated'
+
+            return (
+              <div
+                key={`${wf.workflowId}-${wf.runId}`}
+                className={cn(
+                  'bg-card rounded-lg border p-4 lg:p-5 transition-all',
+                  isRunning ? 'border-blue-500/30 shadow-sm shadow-blue-500/5' :
+                  isCompleted ? 'border-green-500/30' :
+                  isFailed ? 'border-red-500/30' :
+                  isTerminated ? 'border-gray-500/20' :
+                  'border-border'
+                )}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={cn(
+                      'w-1 h-12 rounded-full shrink-0',
+                      isRunning ? 'bg-blue-500 animate-pulse' :
+                      isCompleted ? 'bg-green-500' :
+                      isFailed ? 'bg-red-500' :
+                      'bg-gray-500'
+                    )} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm truncate">{wf.workflowId}</span>
+                        <StatusBadge status={wf.status} />
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        <span className="capitalize">{wf.type} repo</span>
+                        <span>{formatDate(wf.startTime)}</span>
+                        {wf.duration && <span>{formatDuration(wf.duration)}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 pl-4 lg:pl-0">
+                    {isCompleted && repoName && (
+                      <Link
+                        href={`/repos/${encodeURIComponent(repoName)}/wiki`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors"
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        View Wiki
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => router.push(`/workflows/${wf.workflowId}`)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Details
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-          </>
+            )
+          })
+        )}
+
+        {data?.nextPageToken && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setPageToken(data.nextPageToken)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Load More
+            </button>
+          </div>
         )}
       </div>
     </div>

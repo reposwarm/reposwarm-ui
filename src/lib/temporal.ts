@@ -9,6 +9,14 @@ const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE || 'investigate-task
 // HTTP URL for read-only operations (list, get, history) via Temporal UI proxy
 const TEMPORAL_HTTP_URL = process.env.TEMPORAL_HTTP_URL || 'http://reposwarm-temporal-nlb-11f3aaedbbea9cf1.elb.us-east-1.amazonaws.com:8233'
 
+
+function normalizeStatus(status: string): string {
+  if (!status) return 'unknown'
+  // WORKFLOW_EXECUTION_STATUS_RUNNING -> Running
+  const cleaned = status.replace('WORKFLOW_EXECUTION_STATUS_', '')
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase()
+}
+
 let _client: Client | null = null
 
 async function getClient(): Promise<Client> {
@@ -129,7 +137,7 @@ export class TemporalClient {
       workflowId: exec.execution?.workflowId || '',
       runId: exec.execution?.runId || '',
       type,
-      status: exec.status || 'Running',
+      status: normalizeStatus(exec.status || 'Running') as any,
       startTime: exec.startTime || new Date().toISOString(),
       closeTime: exec.closeTime,
       duration: exec.closeTime

@@ -21,6 +21,7 @@ const navigation = [
   { name: 'Workflows', href: '/workflows', icon: Activity },
   { name: 'Repositories', href: '/repos', icon: GitBranch },
   { name: 'Triggers', href: '/triggers', icon: Zap },
+  { name: 'Wiki', href: '/wiki', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
