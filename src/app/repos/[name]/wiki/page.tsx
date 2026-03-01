@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
 import {
   BookOpen, FileText, ChevronLeft, Search, Clock,
   Shield, Database, Layers, Code, Globe, Cpu, GitBranch,
-  Lock, Eye, Activity, Zap, Box, Network
+  Lock, Eye, Activity, Zap, Box, Network, ExternalLink, Copy, Check
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,36 @@ const SECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>>
   events: Zap,
   feature_flags: Zap,
   ml_services: Cpu
+}
+
+
+function RawMarkdownLink({ repo }: { repo: string }) {
+  const [copied, setCopied] = useState(false)
+  const rawUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/v1/wiki/${encodeURIComponent(repo)}/raw`
+    : `/v1/wiki/${encodeURIComponent(repo)}/raw`
+
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <a
+        href={rawUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors"
+        title="Open raw markdown — use this URL for AI agents"
+      >
+        <ExternalLink className="h-3 w-3" />
+        Raw Markdown
+      </a>
+      <button
+        onClick={() => { navigator.clipboard.writeText(rawUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+        className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-background border border-border rounded-md hover:bg-accent transition-colors"
+        title="Copy raw markdown URL"
+      >
+        {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+      </button>
+    </div>
+  )
 }
 
 export default function WikiPage({ params }: { params: Promise<{ name: string }> }) {
@@ -99,10 +129,11 @@ export default function WikiPage({ params }: { params: Promise<{ name: string }>
         <Link href="/repos" className="p-2 hover:bg-accent rounded-lg">
           <ChevronLeft className="h-5 w-5" />
         </Link>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl lg:text-2xl font-semibold truncate">{repoName}</h1>
           <p className="text-sm text-muted-foreground">{index.sections.length} sections documented</p>
         </div>
+        <RawMarkdownLink repo={repoName} />
         <button
           className="lg:hidden ml-auto p-2 hover:bg-accent rounded-lg"
           onClick={() => setSidebarOpen(!sidebarOpen)}
