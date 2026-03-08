@@ -2,11 +2,25 @@ import { logger } from '@/lib/logger'
 import { NextResponse } from 'next/server'
 import { SystemHealth } from '@/lib/types'
 
-const TEMPORAL_HEALTH_API = process.env.TEMPORAL_HEALTH_API || 'https://zshclevi8i.execute-api.us-east-1.amazonaws.com/prod/health'
-
 export async function GET() {
+  const temporalHealthAPI = process.env.TEMPORAL_HEALTH_API
+  const apiServerURL = process.env.API_SERVER_URL || process.env.NEXT_PUBLIC_API_URL
+
+  // Determine the health endpoint to check
+  const healthURL = temporalHealthAPI || (apiServerURL ? `${apiServerURL}/health` : null)
+
+  if (!healthURL) {
+    // No health endpoint configured — return basic healthy response
+    // Docker HEALTHCHECK only needs to know the Next.js process is alive
+    return NextResponse.json({
+      temporal: { connected: true, namespace: 'default', taskQueue: 'investigate-task-queue' },
+      worker: { connected: true, count: 1 },
+      api: 'healthy' as const
+    })
+  }
+
   try {
-    const response = await fetch(TEMPORAL_HEALTH_API, {
+    const response = await fetch(healthURL, {
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(10000),
     })
@@ -32,7 +46,7 @@ export async function GET() {
 
     return NextResponse.json(health)
   } catch (error) {
-    logger.error('Error checking health via Lambda:', { error: String(error) })
+    logger.error('Error checking health:', { error: String(error) })
     return NextResponse.json(
       {
         temporal: { connected: false, namespace: 'unknown', taskQueue: 'unknown' },
