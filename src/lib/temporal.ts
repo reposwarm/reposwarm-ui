@@ -1,6 +1,7 @@
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from '@temporalio/client'
 import { WorkflowExecution, WorkflowHistory } from './types'
 import { logger } from './logger'
+import { formatDuration } from './utils'
 
 const TEMPORAL_SERVER_URL = process.env.TEMPORAL_SERVER_URL || 'reposwarm-temporal-nlb-11f3aaedbbea9cf1.elb.us-east-1.amazonaws.com:7233'
 const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE || 'default'
@@ -133,20 +134,31 @@ export class TemporalClient {
 
   private mapExecution(exec: any): WorkflowExecution {
     const type = this.inferWorkflowType(exec.type?.name || '')
+    const startTime = exec.startTime || new Date().toISOString()
+    const startMs = new Date(startTime).getTime()
+    const nowMs = Date.now()
+    const agoMs = nowMs - startMs
+    const status = normalizeStatus(exec.status || 'Running') as any
+
+    // A workflow is stale if it's been running for more than 24 hours
+    const stale = status === 'Running' && agoMs > 24 * 60 * 60 * 1000
+
     return {
       workflowId: exec.execution?.workflowId || '',
       runId: exec.execution?.runId || '',
       type,
-      status: normalizeStatus(exec.status || 'Running') as any,
-      startTime: exec.startTime || new Date().toISOString(),
+      status,
+      startTime,
       closeTime: exec.closeTime,
       duration: exec.closeTime
-        ? new Date(exec.closeTime).getTime() - new Date(exec.startTime).getTime()
+        ? new Date(exec.closeTime).getTime() - startMs
         : undefined,
       taskQueueName: exec.taskQueue?.name || this.taskQueue,
       input: exec.input,
       result: exec.result,
-      memo: exec.memo
+      memo: exec.memo,
+      stale,
+      startedAgo: formatDuration(agoMs),
     }
   }
 
