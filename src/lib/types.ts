@@ -14,6 +14,8 @@ export interface WorkflowExecution {
   input?: any
   result?: any
   memo?: Record<string, any>
+  stale: boolean
+  startedAgo: string
 }
 
 export interface WorkflowHistory {

@@ -64,8 +64,13 @@ export default function WorkflowDetailPage() {
           </button>
           <div className="flex-1">
             <h1 className="text-2xl font-semibold font-mono">{workflow.workflowId}</h1>
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center gap-4 mt-2 flex-wrap">
               <StatusBadge status={workflow.status} />
+              {workflow.stale && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                  STALE
+                </span>
+              )}
               <span className="text-sm text-muted-foreground capitalize">
                 {workflow.type} workflow
               </span>
@@ -86,6 +91,9 @@ export default function WorkflowDetailPage() {
           <div>
             <p className="text-sm text-muted-foreground">Start Time</p>
             <p className="font-medium">{formatDate(workflow.startTime)}</p>
+            {workflow.status === 'Running' && (
+              <p className="text-xs text-muted-foreground mt-0.5">started {workflow.startedAgo}</p>
+            )}
           </div>
           {workflow.closeTime && (
             <div>

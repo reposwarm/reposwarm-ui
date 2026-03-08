@@ -93,6 +93,7 @@ export default function WorkflowsPage() {
                 key={`${wf.workflowId}-${wf.runId}`}
                 className={cn(
                   'bg-card rounded-lg border p-4 lg:p-5 transition-all',
+                  wf.stale ? 'border-amber-500/40 bg-amber-500/5 shadow-sm shadow-amber-500/10' :
                   isRunning ? 'border-yellow-500/30 shadow-sm shadow-yellow-500/5' :
                   isCompleted ? 'border-green-500/30' :
                   isFailed ? 'border-red-500/30' :
@@ -104,6 +105,7 @@ export default function WorkflowsPage() {
                   <div className="flex items-start gap-3 min-w-0">
                     <div className={cn(
                       'w-1 h-12 rounded-full shrink-0',
+                      wf.stale ? 'bg-amber-500 animate-pulse' :
                       isRunning ? 'bg-yellow-500 animate-pulse' :
                       isCompleted ? 'bg-green-500' :
                       isFailed ? 'bg-red-500' :
@@ -113,10 +115,16 @@ export default function WorkflowsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm truncate">{wf.workflowId}</span>
                         <StatusBadge status={wf.status} />
+                        {wf.stale && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            STALE
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                         <span className="capitalize">{wf.type} repo</span>
-                        <span>{formatDate(wf.startTime)}</span>
+                        {isRunning && <span>started {wf.startedAgo}</span>}
+                        {!isRunning && <span>{formatDate(wf.startTime)}</span>}
                         {wf.duration && <span>{formatDuration(wf.duration)}</span>}
                       </div>
                     </div>
